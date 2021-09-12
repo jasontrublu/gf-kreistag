@@ -22,7 +22,6 @@ const URL = `${process.env.REACT_APP_URL}`;
 const App = () => {
   const classes = useStyles();
   const [loaded, setLoaded] = useState(false);
-  const [source, setSource] = useState('');
   const [partyResults, setPartyResults] = useState({});
   const seats = 58
   const parties = {
@@ -39,14 +38,11 @@ const App = () => {
     D11: 'ÖDP',
     D12: 'Die Partei',
   }
-  const rawdata = 'datum;wahl;ags;gebiet-nr;gebiet-name;max-schnellmeldungen;anz-schnellmeldungen;A1;A2;A3;A;B;B1;C;D;D1_summe_liste_kandidaten;D2_summe_liste_kandidaten;D3_summe_liste_kandidaten;D4_summe_liste_kandidaten;D5_summe_liste_kandidaten\n' +
-    '15.10.2017;Landtagswahl;03151000;0;Landkreis Gifhorn;206;206;119699;15654;0;135353;85584;14657;600;2600;700;1000;400;300;200\n'
-
   const extracted = (extractedData) => {
     const res = []
     let remainingSeats = seats
     let remainders = []
-    const totalVotes = extractedData['D']
+    const totalVotes = extractedData['D'] > 0 ? extractedData['D'] : 0
     for (let i = 1; i < 99; i++) {
       let key = 'D' + i + '_summe_liste_kandidaten';
       if (extractedData[key] !== undefined) {
@@ -58,6 +54,10 @@ const App = () => {
           value: Math.floor(extractedData[key] * seats / totalVotes),
           remainder: (extractedData[key] * seats % totalVotes) / totalVotes,
           remainderSeats: 0,
+        }
+        if (totalVotes === 0) {
+          res[i].seats = 0
+          res[i].remainder = 0
         }
         remainingSeats = remainingSeats - res[i].primarySeats
         remainders[i] = {
@@ -79,28 +79,8 @@ const App = () => {
     setPartyResults(res);
   }
   useEffect(() => {
-    Papa.parse(rawdata, {
-      header: true,
-      complete: function (results) {
-        console.log(results);
-        extracted(results.data[0]);
-        setLoaded(true)
-        setSource('example data')
-      }
-    });
+    fileFromServer()
   }, []);
-  const handleFileUpload = e => {
-    console.log("file upload");
-    Papa.parse(e.target.files[0], {
-      header: true,
-      complete: function (results) {
-        console.log(results);
-        extracted(results.data[0]);
-        setLoaded(true)
-        setSource('uploaded file')
-      }
-    });
-  }
   const fileFromServer = () => {
     Papa.parse(URL + '/Open-Data-Kreiswahl-NDS2191.csv', {
       download: true,
@@ -109,7 +89,6 @@ const App = () => {
         console.log(results);
         extracted(results.data[0]);
         setLoaded(true)
-        setSource('server')
       }
     });
   }
@@ -120,15 +99,6 @@ const App = () => {
         <h1>GF Kreistagswahl</h1>
       </header>
       <Container maxWidth="sm">
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={handleFileUpload}
-        />
-        <br/>
-        <button onClick={fileFromServer}>
-          Load from server
-        </button>
         <br/>
         {
           loaded && <>
@@ -152,7 +122,6 @@ const App = () => {
                 </TableBody>
               </Table>
             </TableContainer>
-            <p>Source: {source}</p>
             <PieChart width={600} height={600}>
               <Pie
                 dataKey="value"
